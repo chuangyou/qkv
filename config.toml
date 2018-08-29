@@ -1,0 +1,13 @@
+[qkv]
+address = "0.0.0.0:8379"
+max_connection = 10000
+auth = "1474741"
+logfile = ""
+loglevel = "debug"
+maxproc = 4
+#expire checker
+stype_checker_loop = 10
+stype_checker_interval = 1000
+
+[tikv]
+pds = "192.168.16.68:2379"
