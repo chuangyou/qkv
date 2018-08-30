@@ -18,12 +18,18 @@ func SetTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
 		endKey   []byte
 		err      error
 		ret      int
+		tikv_txn kv.Transaction
 	)
 	c = time.Tick(time.Duration(interval) * time.Millisecond)
 	for _ = range c {
 		startKey = utils.EncodeExpireKey([]byte{0}, utils.SET_TYPE, 0)
 		endKey = utils.EncodeExpireKey([]byte{0}, utils.SET_TYPE, math.MaxInt64)
-		ret, err = delExpSetType(tdb, startKey, endKey, maxLoops)
+		tikv_txn, err = tdb.NewTxn()
+		if err != nil {
+			log.Warnf("ttl checker start transation failed, %s", err.Error())
+			continue
+		}
+		ret, err = delExpSetType(tdb, tikv_txn, startKey, endKey, maxLoops)
 		if err != nil {
 			log.Warnf("set ttl checker decode key failed, %s", err.Error())
 		} else {
@@ -35,7 +41,7 @@ func SetTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
 		}
 	}
 }
-func delExpSetType(tdb *Tidis, startKey, endKey []byte, maxLoops int) (ret int, err error) {
+func delExpSetType(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, maxLoops int) (ret int, err error) {
 	var (
 		loops    int
 		snapshot kv.Snapshot
@@ -43,13 +49,8 @@ func delExpSetType(tdb *Tidis, startKey, endKey []byte, maxLoops int) (ret int, 
 		key      []byte
 		ts       uint64
 		ttlKey   []byte
-		tikv_txn kv.Transaction
 	)
-	tikv_txn, err = tdb.NewTxn()
-	if err != nil {
-		log.Warnf("ttl checker start transation failed, %s", err.Error())
-		return
-	}
+
 	defer tikv_txn.Rollback()
 	snapshot = tikv_txn.GetSnapshot()
 	it, err = ti.NewIterator(startKey, endKey, snapshot, false)
@@ -75,7 +76,6 @@ func delExpSetType(tdb *Tidis, startKey, endKey []byte, maxLoops int) (ret int, 
 		if err = tikv_txn.Delete(ttlKey); err != nil {
 			return
 		}
-		log.Debug("操你妈", tikv_txn)
 		if _, err = tdb.SDel(tikv_txn, key); err != nil {
 			return
 		}
