@@ -292,7 +292,7 @@ func expireatCommand(c *Client) (err error) {
 		err = qkverror.ErrorCommandParams
 		return
 	}
-	ret, err = c.tdb.ExpireAt(c.GetTxn(), c.args[0], timestamp)
+	ret, err = c.tdb.SExpireAt(c.GetTxn(), c.args[0], timestamp)
 	if err != nil {
 		return
 	}

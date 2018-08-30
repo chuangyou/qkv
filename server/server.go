@@ -42,7 +42,9 @@ func (s *Server) Start() {
 	}
 }
 func (s *Server) TTLCheck() {
-	go tidis.StringTypeTTLRun(s.conf.QKV.StypeCheckerLoop, s.conf.QKV.StypeCheckerInterval, s.tdb)
+	go tidis.StringTTLCheckerRun(s.conf.QKV.StringCheckerLoop, s.conf.QKV.StringCheckerInterval, s.tdb)
+	go tidis.SetTTLCheckerRun(s.conf.QKV.SetCheckerLoop, s.conf.QKV.SetCheckerInterval, s.tdb)
+
 }
 func (s *Server) acceptTCP() {
 	var (

@@ -6,8 +6,9 @@ logfile = ""
 loglevel = "debug"
 maxproc = 4
 #expire checker
-stype_checker_loop = 10
-stype_checker_interval = 1000
-
+string_checker_loop = 10
+string_checker_interval = 1000
+set_checker_loop = 10
+set_checker_interval = 1000
 [tikv]
 pds = "192.168.16.68:2379"

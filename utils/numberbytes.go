@@ -18,6 +18,13 @@ func StrBytesToInt64(n []byte) (i int64, err error) {
 	i, err = strconv.ParseInt(string(n), 10, 64)
 	return
 }
+func BytesToInt64(n []byte) (int64, error) {
+	if n == nil || len(n) < 8 {
+		return 0, ErrParams
+	}
+
+	return int64(binary.BigEndian.Uint64(n)), nil
+}
 func BytesToUint64(n []byte) (b uint64, err error) {
 	if n == nil || len(n) < 8 {
 		err = ErrParams
@@ -39,7 +46,12 @@ func Uint64ToBytesExt(dst []byte, n uint64) error {
 	binary.BigEndian.PutUint64(dst, n)
 	return nil
 }
+func Int64ToBytes(n int64) ([]byte, error) {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(n))
 
+	return b, nil
+}
 func Int64ToStrBytes(n int64) ([]byte, error) {
 	return strconv.AppendInt(nil, n, 10), nil
 }

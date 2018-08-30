@@ -29,7 +29,7 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 	if conf.QKV.LogLevel == "info" {
-		log.SetLevel(log.DebugLevel)
+		log.SetLevel(log.InfoLevel)
 	}
 	qkvServer, err := server.NewServer(conf)
 	if err != nil {

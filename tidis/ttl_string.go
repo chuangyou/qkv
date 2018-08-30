@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func StringTypeTTLRun(maxLoops, interval int, tdb *Tidis) {
+func StringTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
 	var (
 		c        <-chan time.Time
 		startKey []byte

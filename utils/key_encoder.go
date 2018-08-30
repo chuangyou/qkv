@@ -1,7 +1,14 @@
 package utils
 
 import (
+	"math"
+
 	"github.com/chuangyou/qkv/qkverror"
+)
+
+var (
+	SCORE_MIN int64 = math.MinInt64 + 2
+	SCORE_MAX int64 = math.MaxInt64 - 1
 )
 
 func EncodeStringKey(key []byte) []byte {
@@ -90,9 +97,100 @@ func DecodeSetData(rawkey []byte) (key []byte, field []byte, err error) {
 
 	return
 }
+
+//EncodeSetKey encode set struct key
 func EncodeSetKey(key []byte) (buf []byte) {
 	buf = make([]byte, len(key)+1)
 	buf[0] = SET_TYPE
 	copy(buf[1:], key)
 	return buf
+}
+
+//sorted set = type|key
+func EncodeZSetKey(key []byte) []byte {
+	buf := make([]byte, len(key)+1)
+	buf[0] = ZSET_TYPE
+	copy(buf[1:], key)
+	return buf
+}
+
+// type|len(key)|key|len(member)|member
+func EncodeZSetData(key, member []byte) (buf []byte) {
+	var (
+		pos int = 0
+	)
+
+	buf = make([]byte, 1+4+len(key)+len(member))
+	buf[pos] = ZSET_TYPE
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(member)))
+	pos = pos + 2
+
+	copy(buf[pos:], member)
+
+	return buf
+}
+
+// type|len(key)|key|score|member
+func EncodeZSetScore(key, member []byte, score int64) (buf []byte) {
+	var (
+		pos int = 0
+	)
+
+	buf = make([]byte, 1+2+len(key)+8+len(member))
+	buf[pos] = ZSET_SCORE
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+
+	Uint64ToBytesExt(buf[pos:], ZScoreOffset(score))
+	pos = pos + 8
+
+	copy(buf[pos:], member)
+
+	return
+}
+
+// type|len(key)|key|score|member
+func DecodeZSetScore(rawkey []byte) (key []byte, member []byte, score int64, err error) {
+	var (
+		pos       int = 0
+		keyLen    uint16
+		tempScore uint64
+	)
+
+	if rawkey[pos] != ZSET_TYPE {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+
+	keyLen, _ = BytesToUint16(rawkey[pos:])
+	pos = pos + 2
+
+	key = rawkey[pos : pos+int(keyLen)]
+	pos = pos + int(keyLen)
+
+	tempScore, _ = BytesToUint64(rawkey[pos:])
+	score = int64(tempScore)
+	pos = pos + 8
+
+	member = rawkey[pos:]
+
+	return
+}
+
+func ZScoreOffset(score int64) uint64 {
+	return uint64(score + SCORE_MAX)
 }
