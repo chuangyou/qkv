@@ -3,8 +3,10 @@ package utils
 const (
 	STRING_TYPE  byte = 0
 	SET_TYPE     byte = 1
-	ZSET_TYPE    byte = 2
-	ZSET_SCORE   byte = 3
+	SET_DATA     byte = 2
+	ZSET_TYPE    byte = 3
+	ZSET_DATA    byte = 4
+	ZSET_SCORE   byte = 5
 	TTL_TYPE     byte = 109
 	EXPTIME_TYPE byte = 110
 )
@@ -16,3 +18,21 @@ const (
 var (
 	EmptyListInterfaces []interface{} = make([]interface{}, 0)
 )
+
+func ChkPrefix(src []byte) bool {
+	if len(src) == 0 {
+		return false
+	}
+	switch src[0] {
+	case '-':
+		return true
+	case '+':
+		return true
+	case '(':
+		return true
+	case '[':
+		return true
+	default:
+		return false
+	}
+}

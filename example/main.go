@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	//	"time"
+	//"time"
 
 	"github.com/garyburd/redigo/redis"
 )
@@ -21,15 +21,18 @@ func main() {
 	redisPool = newPool("192.168.16.200:8379", "1474741")
 	conn := getRedis()
 	defer conn.Close()
-	log.Println(conn.Do("ZADD", "rank", 1, "a"))
-	log.Println(conn.Do("ZADD", "rank", 1, "b"))
-	log.Println(redis.Strings(conn.Do("ZRANGE", "rank", 0, -1)))
-	//	log.Println(conn.Do("SADD", "key1", "a"))
-	//	log.Println(conn.Do("EXPIRE", "key1", 10))
-	//	log.Println(conn.Do("SET", "key1", "a"))
-	//	log.Println(conn.Do("EXPIRE", "key1", 10))
-	//	log.Println(conn.Do("GET", "key1"))
-	//	log.Println(conn.Do("TTL", "key1"))
+	log.Println(conn.Do("ZADD", "rank3", 1, "a"))
+	log.Println(conn.Do("ZADD", "rank3", 2, "b"))
+	log.Println(conn.Do("ZADD", "rank3", 2, "c"))
+	log.Println(conn.Do("ZINCRBY", "rank3", 2, "c"))
+	log.Println(conn.Do("ZINCRBY", "rank3", 2, "c"))
+	log.Println(conn.Do("ZINCRBY", "rank3", 200, "c"))
+	log.Println(conn.Do("ZINCRBY", "rank3", -100, "c"))
+	log.Println(redis.Strings(conn.Do("ZRANGE", "rank3", 0, -1, "WITHSCORES")))
+	log.Println(redis.Int(conn.Do("ZLEXCOUNT", "rank3", "-", "+")))
+	log.Println(redis.Int(conn.Do("ZCARD", "rank3")))
+	log.Println(redis.Int(conn.Do("ZCOUNT", "rank3", "1", "2")))
+
 	//	log.Println(conn.Do("SADD", "key1", "b"))
 	//	log.Println(conn.Do("SADD", "key1", "c"))
 	//	log.Println(conn.Do("SADD", "key1", "f"))

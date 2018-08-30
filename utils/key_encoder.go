@@ -63,7 +63,7 @@ func EncodeSetData(key, member []byte) (buf []byte) {
 	)
 	bufSize = 1 + 2 + len(key) + len(member)
 	buf = make([]byte, bufSize)
-	buf[0] = SET_TYPE //SET_TYPE 1 byte
+	buf[0] = SET_DATA //SET_DATA 1 byte
 	pos++
 
 	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
@@ -82,7 +82,7 @@ func DecodeSetData(rawkey []byte) (key []byte, field []byte, err error) {
 		pos       uint16 = 0
 		keyLength uint16
 	)
-	if rawkey[0] != SET_TYPE {
+	if rawkey[0] != SET_DATA {
 		err = qkverror.ErrorTypeNotMatch
 		return
 	}
@@ -121,7 +121,7 @@ func EncodeZSetData(key, member []byte) (buf []byte) {
 	)
 
 	buf = make([]byte, 1+4+len(key)+len(member))
-	buf[pos] = ZSET_TYPE
+	buf[pos] = ZSET_DATA
 	pos++
 
 	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
@@ -134,6 +134,27 @@ func EncodeZSetData(key, member []byte) (buf []byte) {
 	pos = pos + 2
 
 	copy(buf[pos:], member)
+
+	return
+}
+
+func EncodeZSetDataEnd(key []byte) (buf []byte) {
+	var (
+		pos int = 0
+	)
+
+	buf = make([]byte, 1+4+len(key))
+	buf[pos] = ZSET_DATA
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+	a := -1
+	Uint16ToBytesExt(buf[pos:], uint16(a))
+	pos = pos + 2
 
 	return buf
 }
@@ -170,7 +191,7 @@ func DecodeZSetScore(rawkey []byte) (key []byte, member []byte, score int64, err
 		tempScore uint64
 	)
 
-	if rawkey[pos] != ZSET_TYPE {
+	if rawkey[pos] != ZSET_SCORE {
 		err = qkverror.ErrorTypeNotMatch
 		return
 	}
@@ -183,7 +204,7 @@ func DecodeZSetScore(rawkey []byte) (key []byte, member []byte, score int64, err
 	pos = pos + int(keyLen)
 
 	tempScore, _ = BytesToUint64(rawkey[pos:])
-	score = int64(tempScore)
+	score = ZScoreRestore(tempScore)
 	pos = pos + 8
 
 	member = rawkey[pos:]
@@ -193,4 +214,7 @@ func DecodeZSetScore(rawkey []byte) (key []byte, member []byte, score int64, err
 
 func ZScoreOffset(score int64) uint64 {
 	return uint64(score + SCORE_MAX)
+}
+func ZScoreRestore(rscore uint64) int64 {
+	return int64(rscore - uint64(SCORE_MAX))
 }
