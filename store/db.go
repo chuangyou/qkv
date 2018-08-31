@@ -19,6 +19,11 @@ type DB interface {
 	STTL(interface{}, []byte) (int64, error)
 	SPTTL(interface{}, []byte) (int64, error)
 	//set
+	//zset
+	ZPExipre(interface{}, []byte, int64) (int, error)
+	ZTTL(interface{}, []byte) (int64, error)
+	ZPTTL(interface{}, []byte) (int64, error)
+	//zset
 	Incr(interface{}, []byte, int64) (int64, error)
 	DeleteRangeWithTxn(interface{}, []byte, []byte, uint64) (uint64, error)
 	GetRangeKeys(interface{}, []byte, bool, []byte, bool, uint64, uint64, bool) ([][]byte, uint64, error)

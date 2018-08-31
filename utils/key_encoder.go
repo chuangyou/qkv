@@ -138,6 +138,33 @@ func EncodeZSetData(key, member []byte) (buf []byte) {
 	return
 }
 
+// type|len(key)|key|len(member)|member
+func DecodeZSetData(rawKey []byte) (key []byte, member []byte, err error) {
+	var (
+		pos       int = 0
+		keyLen    uint16
+		memberLen uint16
+	)
+
+	if rawKey[pos] != ZSET_DATA {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+
+	keyLen, _ = BytesToUint16(rawKey[pos:])
+	pos = pos + 2
+
+	key = rawKey[pos : pos+int(keyLen)]
+	pos = pos + int(keyLen)
+
+	memberLen, _ = BytesToUint16(rawKey[pos:])
+	pos = pos + 2
+
+	member = rawKey[pos : pos+int(memberLen)]
+
+	return
+}
 func EncodeZSetDataEnd(key []byte) (buf []byte) {
 	var (
 		pos int = 0

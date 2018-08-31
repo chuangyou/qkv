@@ -15,6 +15,8 @@ type QKVConfig struct {
 	StringCheckerInterval int    `toml:"string_checker_interval"`
 	SetCheckerLoop        int    `toml:"set_checker_loop"`
 	SetCheckerInterval    int    `toml:"set_checker_interval"`
+	ZSetCheckerLoop       int    `toml:"zset_checker_loop"`
+	ZSetCheckerInterval   int    `toml:"zset_checker_interval"`
 }
 type TikvConfig struct {
 	Pds string `toml:"pds"`

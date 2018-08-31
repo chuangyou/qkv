@@ -6,7 +6,6 @@ import (
 	"github.com/chuangyou/qkv/qkverror"
 	"github.com/chuangyou/qkv/utils"
 	"github.com/pingcap/tidb/kv"
-	log "github.com/sirupsen/logrus"
 )
 
 //STTL Returns the remaining time to live of a key that has a timeout.
@@ -71,7 +70,6 @@ func (tikv *Tikv) SPExipre(txn interface{}, key []byte, ts int64) (ret int, err 
 		tsRaw     []byte
 		ok        bool
 	)
-	log.Debug("开始处理")
 	tikv_txn, ok = txn.(kv.Transaction)
 	if !ok {
 		err = qkverror.ErrorServerInternal
@@ -83,7 +81,6 @@ func (tikv *Tikv) SPExipre(txn interface{}, key []byte, ts int64) (ret int, err 
 	}
 	if v == nil {
 		//not key
-		log.Debug("fuck", string(key))
 		return
 	}
 	//get ttl
