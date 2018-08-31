@@ -7,6 +7,7 @@ import (
 	"github.com/chuangyou/qkv/config"
 	"github.com/chuangyou/qkv/server"
 	log "github.com/sirupsen/logrus"
+	caller "github.com/xdxiaodong/logrus-hook-caller"
 )
 
 var (
@@ -18,6 +19,7 @@ func main() {
 	//init config
 	conf := config.InitConfig(*ConfigFile)
 	//init log
+	log.AddHook(caller.NewHook(&caller.CallerHookOptions{}))
 	if conf.QKV.LogFile != "" {
 		file, err := os.OpenFile(conf.QKV.LogFile, os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {

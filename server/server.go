@@ -8,8 +8,12 @@ import (
 	"github.com/chuangyou/qkv/config"
 	"github.com/chuangyou/qkv/tidis"
 
+	"sync/atomic"
+
 	log "github.com/sirupsen/logrus"
 )
+
+var serverConnCount int32 = 0
 
 type Server struct {
 	conf     *config.Config
@@ -49,9 +53,9 @@ func (s *Server) TTLCheck() {
 }
 func (s *Server) acceptTCP() {
 	var (
-		conn    *net.TCPConn
-		err     error
-		connNum int
+		conn   *net.TCPConn
+		err    error
+		client *Client
 	)
 	for {
 		if conn, err = s.listener.AcceptTCP(); err != nil {
@@ -59,14 +63,23 @@ func (s *Server) acceptTCP() {
 			log.Error("listener.Accept(\"%s\") error(%v)", s.listener.Addr().String(), err)
 			return
 		}
-		client := NewClient(conn, s.tdb, s.conf.QKV.Auth)
-		go s.serveTCP(client)
-		if connNum++; connNum >= s.conf.QKV.MaxConnection {
-			connNum = 0
+
+		atomic.AddInt32(&serverConnCount, 1)
+		if s.conf.QKV.MaxConnection > 0 {
+			//check server max connection
+			if atomic.LoadInt32(&serverConnCount) > s.conf.QKV.MaxConnection {
+				log.Errorf("max server connection,disconn client ip:%s", conn.LocalAddr().String())
+				conn.Close()
+				return
+			}
 		}
+		client = NewClient(conn, s.tdb, s.conf.QKV.Auth)
+		go s.serveTCP(client)
+
 	}
 }
 func (s *Server) serveTCP(client *Client) {
+	defer atomic.AddInt32(&serverConnCount, -1)
 	for {
 		req, err := client.r.ParseRequest()
 		if err != nil && err != io.EOF {

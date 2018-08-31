@@ -31,12 +31,12 @@ func ZSetTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
 		}
 		ret, err = delExpZSetType(tdb, tikv_txn, startKey, endKey, maxLoops)
 		if err != nil {
-			log.Warnf("set ttl checker decode key failed, %s", err.Error())
+			log.Warnf("zset ttl checker decode key failed, %s", err.Error())
 		} else {
 			if ret == -1 {
-				//log.Debugf("set ttl checker execute none")
+				//log.Debugf("zset ttl checker execute none")
 			} else {
-				log.Debugf("set ttl checker execute %d keys", ret)
+				log.Debugf("zset ttl checker execute %d keys", ret)
 			}
 		}
 	}

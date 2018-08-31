@@ -19,7 +19,7 @@ type Tikv struct {
 //OpenTikv open the tikv connection by pds
 func Open(conf *config.Config) (*Tikv, error) {
 	driver := ti.Driver{}
-	store, err := driver.Open(fmt.Sprintf("tikv://%s/pd?cluster=1", conf.Tikv.Pds))
+	store, err := driver.Open(fmt.Sprintf("tikv://%s?cluster=1&disableGC=false", conf.Tikv.Pds))
 	if err != nil {
 		return nil, err
 	}
