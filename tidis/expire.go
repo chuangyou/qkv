@@ -7,7 +7,6 @@ import (
 	"github.com/chuangyou/qkv/qkverror"
 	"github.com/chuangyou/qkv/utils"
 	"github.com/pingcap/tidb/kv"
-	log "github.com/sirupsen/logrus"
 )
 
 func (tidis *Tidis) DeleteIfExpired(txn interface{}, key []byte, delValue bool) (err error) {
@@ -39,6 +38,7 @@ func (tidis *Tidis) DeleteIfExpired(txn interface{}, key []byte, delValue bool) 
 	if ttl != 0 {
 		return nil
 	}
+
 	//delete expire key
 	err = tidis.removeMetaKey(txn, key)
 	if err != nil {
@@ -47,7 +47,7 @@ func (tidis *Tidis) DeleteIfExpired(txn interface{}, key []byte, delValue bool) 
 	//delete string data
 	if delValue {
 		keys = append(keys, key)
-		_, err = tidis.db.DeleteWithTxn(txn, keys)
+		_, err = tidis.DeleteWithTxn(txn, keys)
 
 	}
 	if notTransaction {
@@ -140,7 +140,6 @@ func (tidis *Tidis) removeMetaKey(txn interface{}, key []byte) (err error) {
 		return
 	}
 	expireKey = utils.EncodeExpireKey(key, int64(ts))
-	log.Debug("expireKey:", string(expireKey))
 	if err = tikv_txn.Delete(ttlKey); err != nil {
 		return
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/chuangyou/qkv/qkverror"
 	"github.com/chuangyou/qkv/utils"
 	"github.com/pingcap/tidb/kv"
-	log "github.com/sirupsen/logrus"
 )
 
 //Get get the value of key.
@@ -158,11 +157,10 @@ func (tidis *Tidis) Delete(txn interface{}, keys [][]byte) (resp int64, err erro
 		// clear expire meta
 		err = tidis.DeleteIfExpired(txn, key, false)
 		if err != nil {
-			log.Debugf("clearexpire error:%v", err)
 			return
 		}
 	}
-	ret, err = tidis.db.DeleteWithTxn(txn, keys)
+	ret, err = tidis.DeleteWithTxn(txn, keys)
 	if err != nil {
 		return
 	} else {

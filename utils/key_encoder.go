@@ -60,3 +60,177 @@ func DecodeExpireKey(key []byte) ([]byte, uint64, error) {
 
 	return key[9:], ts, nil
 }
+
+//type(set)|len(key)|key|member
+func EncodeSetData(key, member []byte) (buf []byte) {
+	var (
+		bufSize int
+		pos     int = 0
+	)
+	bufSize = 1 + 2 + len(key) + len(member)
+	buf = make([]byte, bufSize)
+	buf[0] = SET_DATA //SET_DATA 1 byte
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2 //2 bytes
+	copy(buf[pos:], key)
+
+	pos = pos + len(key)
+	copy(buf[pos:], member)
+
+	return
+}
+
+//type(set)|len(key)|key|member
+func DecodeSetData(rawkey []byte) (key []byte, field []byte, err error) {
+	var (
+		pos       uint16 = 0
+		keyLength uint16
+	)
+	if rawkey[0] != SET_DATA {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+	keyLength, _ = BytesToUint16(rawkey[pos:])
+	pos = pos + 2
+
+	key = rawkey[pos : pos+keyLength]
+	pos = pos + keyLength
+
+	field = rawkey[pos:]
+
+	return
+}
+
+// type|len(key)|key|len(member)|member
+func EncodeZSetData(key, member []byte) (buf []byte) {
+	var (
+		pos int = 0
+	)
+
+	buf = make([]byte, 1+4+len(key)+len(member))
+	buf[pos] = ZSET_DATA
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(member)))
+	pos = pos + 2
+
+	copy(buf[pos:], member)
+
+	return
+}
+
+// type|len(key)|key|len(member)|member
+func DecodeZSetData(rawKey []byte) (key []byte, member []byte, err error) {
+	var (
+		pos       int = 0
+		keyLen    uint16
+		memberLen uint16
+	)
+
+	if rawKey[pos] != ZSET_DATA {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+
+	keyLen, _ = BytesToUint16(rawKey[pos:])
+	pos = pos + 2
+
+	key = rawKey[pos : pos+int(keyLen)]
+	pos = pos + int(keyLen)
+
+	memberLen, _ = BytesToUint16(rawKey[pos:])
+	pos = pos + 2
+
+	member = rawKey[pos : pos+int(memberLen)]
+
+	return
+}
+
+// type|len(key)|key|score|member
+func EncodeZSetScore(key, member []byte, score int64) (buf []byte) {
+	var (
+		pos int = 0
+	)
+
+	buf = make([]byte, 1+2+len(key)+8+len(member))
+	buf[pos] = ZSET_SCORE
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+
+	Uint64ToBytesExt(buf[pos:], ZScoreOffset(score))
+	pos = pos + 8
+
+	copy(buf[pos:], member)
+
+	return
+}
+
+// type|len(key)|key|score|member
+func DecodeZSetScore(rawkey []byte) (key []byte, member []byte, score int64, err error) {
+	var (
+		pos       int = 0
+		keyLen    uint16
+		tempScore uint64
+	)
+
+	if rawkey[pos] != ZSET_SCORE {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+
+	keyLen, _ = BytesToUint16(rawkey[pos:])
+	pos = pos + 2
+
+	key = rawkey[pos : pos+int(keyLen)]
+	pos = pos + int(keyLen)
+
+	tempScore, _ = BytesToUint64(rawkey[pos:])
+	score = ZScoreRestore(tempScore)
+	pos = pos + 8
+
+	member = rawkey[pos:]
+
+	return
+}
+func EncodeZSetDataEnd(key []byte) (buf []byte) {
+	var (
+		pos int = 0
+	)
+
+	buf = make([]byte, 1+4+len(key))
+	buf[pos] = ZSET_DATA
+	pos++
+
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+	a := -1
+	Uint16ToBytesExt(buf[pos:], uint16(a))
+	pos = pos + 2
+
+	return buf
+}
+func ZScoreOffset(score int64) uint64 {
+	return uint64(score + SCORE_MAX)
+}
+func ZScoreRestore(rscore uint64) int64 {
+	return int64(rscore - uint64(SCORE_MAX))
+}

@@ -3,6 +3,7 @@ package tikv
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/chuangyou/qkv/config"
@@ -180,51 +181,6 @@ func (tikv *Tikv) MSet(txn interface{}, kvm map[string][]byte) (resp int, err er
 	return
 }
 
-//DeleteWithTxn removes the specified keys. A key is ignored if it does not exist.
-func (tikv *Tikv) DeleteWithTxn(txn interface{}, keys [][]byte) (deleted int64, err error) {
-	var (
-		ok       bool
-		tikv_txn kv.Transaction
-		rawData  []byte
-		dataType byte
-	)
-	if txn == nil {
-		err = qkverror.ErrorServerInternal
-		return
-	}
-	tikv_txn, ok = txn.(kv.Transaction)
-	if !ok {
-		err = qkverror.ErrorServerInternal
-		return
-	}
-	for _, k := range keys {
-		rawData, _ = tikv.Get(txn, k)
-		if rawData != nil {
-			dataType, _, err = utils.DecodeData(rawData)
-			if err != nil {
-				return
-			}
-			switch dataType {
-			//delete set member
-			//delete zset member
-			//delete hash field
-			//delete list member
-			}
-			//			if err != nil {
-			//				return
-			//			}
-			deleted++
-		}
-
-		err = tikv_txn.Delete(k)
-		if err != nil {
-			deleted = 0
-			return
-		}
-	}
-	return
-}
-
 //SetEX set key to hold the string value and set key to timeout after a given number of seconds
 func (tikv *Tikv) SetEX(txn interface{}, key []byte, seconds int64, value []byte) (err error) {
 	var (
@@ -330,6 +286,114 @@ func (tikv *Tikv) PExipre(txn interface{}, key []byte, ts int64) (ret int, err e
 		return
 	} else {
 		ret = 1
+	}
+	return
+}
+func (tikv *Tikv) GetRangeKeys(txn interface{},
+	start []byte,
+	withStart bool,
+	end []byte,
+	withEnd bool,
+	offset,
+	limit uint64,
+	countOnly bool) (keys [][]byte, count uint64, err error) {
+	var (
+		tikv_txn kv.Transaction
+		ok       bool
+		snapshot kv.Snapshot
+		it       kv.Iterator
+		key      kv.Key
+	)
+	if txn == nil {
+		snapshot, err = tikv.store.GetSnapshot(kv.MaxVersion)
+		if err != nil {
+			return
+		}
+	} else {
+		tikv_txn, ok = txn.(kv.Transaction)
+		if !ok {
+			err = qkverror.ErrorServerInternal
+			return
+		}
+		snapshot = tikv_txn.GetSnapshot()
+	}
+	it, err = snapshot.Seek(start)
+	if err != nil {
+		return
+	}
+	defer it.Close()
+	for limit > 0 {
+		if !it.Valid() {
+			break
+		}
+		key = it.Key()
+
+		err = it.Next()
+		if err != nil {
+			return
+		}
+		if !withStart && key.Cmp(start) == 0 {
+			continue
+		}
+		if !withEnd && key.Cmp(end) == 0 {
+			break
+		}
+		if end != nil && key.Cmp(end) > 0 {
+			break
+		}
+		if offset > 0 {
+			offset--
+			continue
+		}
+		if countOnly {
+			count++
+		} else {
+			keys = append(keys, key)
+		}
+		limit--
+	}
+	return
+}
+func (tikv *Tikv) DeleteRangeWithTxn(txn interface{}, start []byte, end []byte, limit uint64) (deleted uint64, err error) {
+	var (
+		tikv_txn kv.Transaction
+		ok       bool
+		snapshot kv.Snapshot
+		it       kv.Iterator
+		key      kv.Key
+	)
+	tikv_txn, ok = txn.(kv.Transaction)
+	if !ok {
+		err = qkverror.ErrorServerInternal
+		return
+	}
+	snapshot = tikv_txn.GetSnapshot()
+	it, err = snapshot.Seek(start)
+	if err != nil {
+		return
+	}
+	defer it.Close()
+	if limit == 0 {
+		limit = math.MaxUint64
+	}
+	for limit > 0 {
+		if !it.Valid() {
+			break
+		}
+		key = it.Key()
+		if end != nil && key.Cmp(end) > 0 {
+			break
+		}
+		err = tikv_txn.Delete(key)
+		if err != nil {
+			return
+		}
+		limit--
+		deleted++
+		err = it.Next()
+		if err != nil {
+			return
+		}
 	}
 	return
 }

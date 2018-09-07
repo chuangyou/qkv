@@ -70,9 +70,11 @@ func delExpireKey(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, 
 			break
 		}
 		ttlKey = utils.EncodeTTLKey(key)
+		//delete expire key
 		if err = tikv_txn.Delete(it.Key()); err != nil {
 			return
 		}
+		//delete ttl key
 		if err = tikv_txn.Delete(ttlKey); err != nil {
 			return
 		}
@@ -87,10 +89,20 @@ func delExpireKey(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, 
 			}
 		}
 		switch dataType {
-		case utils.STRING_TYPE:
-			if err = tikv_txn.Delete(key); err != nil {
+		//delete set member
+		case utils.SET_TYPE:
+			if _, err = tdb.ClearSetMembers(tikv_txn, key); err != nil {
 				return
 			}
+		//delete zset member
+		case utils.ZSET_TYPE:
+			if _, err = tdb.ZRemRangeByScore(tikv_txn, key, utils.SCORE_MIN, utils.SCORE_MAX); err != nil {
+				return
+			}
+		}
+		//delete key
+		if err = tikv_txn.Delete(key); err != nil {
+			return
 		}
 		it.Next()
 		loops--
