@@ -6,67 +6,50 @@ import (
 )
 
 func init() {
-	//redis GET
 	commandRegister("GET", getCommand)
-	//redis SET
 	commandRegister("SET", setCommand)
-	//redis MGET
 	commandRegister("MGET", mgetCommand)
-	//redis MSET
 	commandRegister("MSET", msetCommand)
-	//redis DEL
 	commandRegister("DEL", delCommand)
-	//redis SETEX
-	commandRegister("SETEX", setexCommand)
-	//redis INCR
+	commandRegister("SETEX", setEXCommand)
 	commandRegister("INCR", incrCommand)
-	//redis INCRBY
 	commandRegister("INCRBY", incrbyCommand)
-	//redis DECRBY
+	commandRegister("DECR", decrCommand)
 	commandRegister("DECRBY", decrbyCommand)
-	//redis STRLEN
 	commandRegister("STRLEN", strlenCommand)
-	//redis TTL
 	commandRegister("TTL", ttlCommand)
-	//redis PTTL
 	commandRegister("PTTL", pttlCommand)
-	//redis EXPIRE
 	commandRegister("EXPIRE", expireCommand)
-	//redis PEXPIRE
 	commandRegister("PEXPIRE", pexpireCommand)
-	//redis EXPIREAT
 	commandRegister("EXPIREAT", expireatCommand)
-	//redis PEXPIREAT
 	commandRegister("PEXPIREAT", pexpireatCommand)
 }
 func getCommand(c *Client) (err error) {
 	var (
-		data []byte
+		value []byte
 	)
 	if len(c.args) != 1 {
 		err = qkverror.ErrorCommandParams
+		return
 	} else {
-		data, err = c.tdb.Get(c.GetTxn(), c.args[0])
+		value, err = c.tdb.Get(c.GetTxn(), c.args[0])
 		if err != nil {
 			return
-		} else {
-			err = c.Resp(data)
 		}
 	}
-	return
+	return c.Resp(value)
 }
 func setCommand(c *Client) (err error) {
 	if len(c.args) != 2 {
 		err = qkverror.ErrorCommandParams
+		return
 	} else {
 		err = c.tdb.Set(c.GetTxn(), c.args[0], c.args[1])
 		if err != nil {
 			return
-		} else {
-			err = c.Resp("OK")
 		}
 	}
-	return
+	return c.Resp("OK")
 }
 func mgetCommand(c *Client) (err error) {
 	var (
@@ -111,7 +94,7 @@ func delCommand(c *Client) (err error) {
 	return c.Resp(int64(ret))
 
 }
-func setexCommand(c *Client) (err error) {
+func setEXCommand(c *Client) (err error) {
 	var (
 		seconds int64
 	)
@@ -135,7 +118,6 @@ func setexCommand(c *Client) (err error) {
 	}
 	return c.Resp("OK")
 }
-
 func incrCommand(c *Client) (err error) {
 	var (
 		ret int64
@@ -292,7 +274,7 @@ func expireatCommand(c *Client) (err error) {
 		err = qkverror.ErrorCommandParams
 		return
 	}
-	ret, err = c.tdb.SExpireAt(c.GetTxn(), c.args[0], timestamp)
+	ret, err = c.tdb.ExpireAt(c.GetTxn(), c.args[0], timestamp)
 	if err != nil {
 		return
 	}

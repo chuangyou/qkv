@@ -5,18 +5,14 @@ import (
 )
 
 type QKVConfig struct {
-	Address               string `toml:"address"`
-	MaxConnection         int32  `toml:"max_connection"`
-	Auth                  string `toml:"auth"`
-	LogFile               string `toml:"logfile"`
-	LogLevel              string `toml:"loglevel"`
-	Maxproc               int    `toml:"maxproc"`
-	StringCheckerLoop     int    `toml:"string_checker_loop"`
-	StringCheckerInterval int    `toml:"string_checker_interval"`
-	SetCheckerLoop        int    `toml:"set_checker_loop"`
-	SetCheckerInterval    int    `toml:"set_checker_interval"`
-	ZSetCheckerLoop       int    `toml:"zset_checker_loop"`
-	ZSetCheckerInterval   int    `toml:"zset_checker_interval"`
+	Address            string `toml:"address"`
+	MaxConnection      int32  `toml:"max_connection"`
+	Auth               string `toml:"auth"`
+	LogFile            string `toml:"logfile"`
+	LogLevel           string `toml:"loglevel"`
+	Maxproc            int    `toml:"maxproc"`
+	TTLCheckerLoop     int    `toml:"ttl_checker_loop"`
+	TTLCheckerInterval int    `toml:"ttl_checker_interval"`
 }
 type TikvConfig struct {
 	Pds string `toml:"pds"`

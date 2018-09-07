@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func StringTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
+func TTLCheckerRun(tdb *Tidis, maxLoops, interval int) {
 	var (
 		c        <-chan time.Time
 		startKey []byte
@@ -22,14 +22,14 @@ func StringTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
 	)
 	c = time.Tick(time.Duration(interval) * time.Millisecond)
 	for _ = range c {
-		startKey = utils.EncodeExpireKey([]byte{0}, utils.STRING_TYPE, 0)
-		endKey = utils.EncodeExpireKey([]byte{0}, utils.STRING_TYPE, math.MaxInt64)
+		startKey = utils.EncodeExpireKey([]byte{0}, 0)
+		endKey = utils.EncodeExpireKey([]byte{0}, math.MaxInt64)
 		tikv_txn, err = tdb.NewTxn()
 		if err != nil {
 			log.Warnf("ttl checker start transation failed, %s", err.Error())
 			continue
 		}
-		ret, err = delExpStringType(tdb, tikv_txn, startKey, endKey, maxLoops)
+		ret, err = delExpireKey(tdb, tikv_txn, startKey, endKey, maxLoops)
 		if err != nil {
 			log.Warnf("string ttl checker decode key failed, %s", err.Error())
 		} else {
@@ -41,7 +41,7 @@ func StringTTLCheckerRun(maxLoops, interval int, tdb *Tidis) {
 		}
 	}
 }
-func delExpStringType(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, maxLoops int) (ret int, err error) {
+func delExpireKey(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, maxLoops int) (ret int, err error) {
 	var (
 		loops    int
 		snapshot kv.Snapshot
@@ -49,7 +49,8 @@ func delExpStringType(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []by
 		key      []byte
 		ts       uint64
 		ttlKey   []byte
-		dataKey  []byte
+		rawData  []byte
+		dataType byte
 	)
 	defer tikv_txn.Rollback()
 	snapshot = tikv_txn.GetSnapshot()
@@ -60,7 +61,7 @@ func delExpStringType(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []by
 	defer it.Close()
 	loops = maxLoops
 	for loops > 0 && it.Valid() {
-		key, ts, err = utils.DecodeExpireKey(it.Key(), utils.STRING_TYPE)
+		key, ts, err = utils.DecodeExpireKey(it.Key())
 		if err != nil {
 			return
 		}
@@ -68,19 +69,32 @@ func delExpStringType(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []by
 			// no key expired
 			break
 		}
-		ttlKey = utils.EncodeTTLKey(key, utils.STRING_TYPE)
-		dataKey = utils.EncodeStringKey(key)
+		ttlKey = utils.EncodeTTLKey(key)
 		if err = tikv_txn.Delete(it.Key()); err != nil {
 			return
 		}
 		if err = tikv_txn.Delete(ttlKey); err != nil {
 			return
 		}
-		if err = tikv_txn.Delete(dataKey); err != nil {
+		rawData, err = tdb.db.Get(tikv_txn, key)
+		if err != nil {
 			return
+		}
+		if rawData != nil {
+			dataType, _, err = utils.DecodeData(rawData)
+			if err != nil {
+				return
+			}
+		}
+		switch dataType {
+		case utils.STRING_TYPE:
+			if err = tikv_txn.Delete(key); err != nil {
+				return
+			}
 		}
 		it.Next()
 		loops--
+		log.Debug(loops)
 	}
 	err = tikv_txn.Commit(context.Background())
 	if maxLoops == loops {

@@ -12,43 +12,96 @@ import (
 
 //Get get the value of key.
 func (tidis *Tidis) Get(txn interface{}, key []byte) (data []byte, err error) {
+	var (
+		rawData  []byte
+		dataType byte
+	)
 	if len(key) == 0 {
 		err = qkverror.ErrorKeyEmpty
 		return
 	}
-	key = utils.EncodeStringKey(key)
-	data, err = tidis.db.Get(txn, key)
+	//delete kv if expired
+	err = tidis.DeleteIfExpired(txn, key, true)
+	if err != nil {
+		return
+	}
+	rawData, err = tidis.db.Get(txn, key)
+	if err != nil {
+		return
+	}
+	if rawData != nil {
+		//decode string data
+		dataType, data, err = utils.DecodeData(rawData)
+		if err != nil {
+			return
+		}
+		if dataType != utils.STRING_TYPE {
+			err = qkverror.ErrorWrongType
+			return
+		}
+	}
 	return
 }
 
 //Set set key to hold the string value.
 func (tidis *Tidis) Set(txn interface{}, key, value []byte) (err error) {
+	var (
+		dataType byte
+		rawData  []byte
+	)
 	if len(key) == 0 {
 		err = qkverror.ErrorKeyEmpty
 		return
 	}
-	key = utils.EncodeStringKey(key)
+	//get old data and data type
+	rawData, err = tidis.db.Get(txn, key)
+	if err != nil {
+		return
+	} else if rawData != nil {
+		//check data type
+		dataType, _, err = utils.DecodeData(rawData)
+		if err != nil {
+			return
+		}
+		if dataType != utils.STRING_TYPE {
+			err = qkverror.ErrorWrongType
+			return
+		}
+	}
+	//encode string data
+	value = utils.EncodeData(utils.STRING_TYPE, value)
 	err = tidis.db.Set(txn, key, value)
+	if err == nil {
+		tidis.DeleteIfExpired(txn, key, false)
+	}
 	return
 }
 
 //MGet returns the values of all specified keys.
 func (tidis *Tidis) MGet(txn interface{}, keys [][]byte) (resp []interface{}, err error) {
 	var (
-		data = make(map[string][]byte)
+		data     = make(map[string][]byte)
+		dataType byte
+		value    []byte
 	)
 	if len(keys) == 0 {
 		err = qkverror.ErrorKeyEmpty
 		return
 	}
-	for i := 0; i < len(keys); i++ {
-		keys[i] = utils.EncodeStringKey(keys[i])
-	}
 	data, err = tidis.db.MGet(txn, keys)
 	resp = make([]interface{}, len(keys))
 	for i, key := range keys {
-		if v, ok := data[string(key)]; ok {
-			resp[i] = v
+		if rawData, ok := data[string(key)]; ok {
+			dataType, value, err = utils.DecodeData(rawData)
+			if err != nil {
+				return
+			}
+			//check data type
+			if dataType != utils.STRING_TYPE {
+				err = qkverror.ErrorWrongType
+				return
+			}
+			resp[i] = value
 		} else {
 			resp[i] = nil
 		}
@@ -66,8 +119,8 @@ func (tidis *Tidis) MSet(txn interface{}, kvs [][]byte) (resp int, err error) {
 		return
 	}
 	for i := 0; i < len(kvs)-1; i += 2 {
-		k := string(utils.EncodeStringKey(kvs[i]))
-		v := kvs[i+1]
+		k := string(kvs[i])
+		v := utils.EncodeData(utils.STRING_TYPE, kvs[i+1])
 		kvm[k] = v
 	}
 	resp, err = tidis.db.MSet(txn, kvm)
@@ -77,7 +130,6 @@ func (tidis *Tidis) MSet(txn interface{}, kvs [][]byte) (resp int, err error) {
 //Delete removes the specified keys. A key is ignored if it does not exist.
 func (tidis *Tidis) Delete(txn interface{}, keys [][]byte) (resp int64, err error) {
 	var (
-		dataKeys       = make([][]byte, len(keys))
 		key            []byte
 		ret            int64
 		tikv_txn       kv.Transaction
@@ -102,19 +154,15 @@ func (tidis *Tidis) Delete(txn interface{}, keys [][]byte) (resp int64, err erro
 		}
 		defer tikv_txn.Rollback()
 	}
-	//encode data key
-	for i := 0; i < len(keys); i++ {
-		dataKeys[i] = utils.EncodeStringKey(keys[i])
-	}
 	for _, key = range keys {
 		// clear expire meta
-		err = tidis.db.ClearExpire(txn, key)
+		err = tidis.DeleteIfExpired(txn, key, false)
 		if err != nil {
 			log.Debugf("clearexpire error:%v", err)
 			return
 		}
 	}
-	ret, err = tidis.db.DeleteWithTxn(txn, dataKeys)
+	ret, err = tidis.db.DeleteWithTxn(txn, keys)
 	if err != nil {
 		return
 	} else {
@@ -131,46 +179,115 @@ func (tidis *Tidis) Delete(txn interface{}, keys [][]byte) (resp int64, err erro
 
 //SetEX set key to hold the string value and set key to timeout after a given number of seconds
 func (tidis *Tidis) SetEX(txn interface{}, key []byte, seconds int64, value []byte) (err error) {
+	var (
+		rawData  []byte
+		dataType byte
+	)
 	if len(key) == 0 {
 		err = qkverror.ErrorKeyEmpty
 		return
 	}
+	//get old data and data type
+	rawData, err = tidis.db.Get(txn, key)
+	if err != nil {
+		return
+	} else if rawData != nil {
+		//check data type
+		dataType, _, err = utils.DecodeData(rawData)
+		if err != nil {
+			return
+		}
+		if dataType != utils.STRING_TYPE {
+			err = qkverror.ErrorWrongType
+			return
+		}
+	}
+	value = utils.EncodeData(utils.STRING_TYPE, value)
 	err = tidis.db.SetEX(txn, key, seconds, value)
 	return
 }
 
 //Incr increments the number stored at key by increment.
 func (tidis *Tidis) Incr(txn interface{}, key []byte, step int64) (ret int64, err error) {
+	var (
+		tikv_txn       kv.Transaction
+		ok             bool
+		notTransaction bool
+		rawData        []byte
+		dataType       byte
+		value          []byte
+		oldStep        int64
+		newStep        int64
+	)
 	if len(key) == 0 {
 		err = qkverror.ErrorKeyEmpty
 		return
 	}
-	key = utils.EncodeStringKey(key)
-	ret, err = tidis.db.Incr(txn, key, step)
+
+	if txn != nil {
+		tikv_txn, ok = txn.(kv.Transaction)
+		if !ok {
+			err = qkverror.ErrorServerInternal
+			return
+		}
+	} else {
+		notTransaction = true
+		txn, err = tidis.db.NewTxn()
+		if err != nil {
+			err = qkverror.ErrorServerInternal
+			return
+		}
+		tikv_txn, ok = txn.(kv.Transaction)
+		if !ok {
+			err = qkverror.ErrorServerInternal
+			return
+		}
+		defer tikv_txn.Rollback()
+	}
+	rawData, err = tidis.db.Get(txn, key)
+	if err != nil {
+		return
+	}
+	if rawData != nil {
+		dataType, value, err = utils.DecodeData(rawData)
+		if err != nil {
+			return
+		}
+		if dataType != utils.STRING_TYPE {
+			err = qkverror.ErrorWrongType
+			return
+		}
+		//old value
+		oldStep, err = utils.StrBytesToInt64(value)
+		if err != nil {
+			err = qkverror.ErrorNotInteger
+			return
+		}
+	}
+	//new value
+	newStep = oldStep + step
+	value, err = utils.Int64ToStrBytes(newStep)
+	if err != nil {
+		return
+	}
+	value = utils.EncodeData(utils.STRING_TYPE, value)
+	err = tikv_txn.Set(key, value)
+	if err != nil {
+		return
+	}
+	if notTransaction {
+		err = tikv_txn.Commit(context.Background())
+		if err != nil {
+			return
+		}
+	}
+	ret = newStep
 	return
 }
 
 //Decr decrements the number stored at key by decrement.
 func (tidis *Tidis) Decr(txn interface{}, key []byte, step int64) (ret int64, err error) {
 	return tidis.Incr(txn, key, -1*step)
-}
-
-//TTL returns the remaining time to live of a key that has a timeout.
-func (tidis *Tidis) TTL(txn interface{}, key []byte) (ttl int64, err error) {
-	if len(key) == 0 {
-		err = qkverror.ErrorKeyEmpty
-		return
-	}
-	return tidis.db.TTL(txn, key)
-}
-
-//PTTL get the time to live for a key in milliseconds
-func (tidis *Tidis) PTTL(txn interface{}, key []byte) (ttl int64, err error) {
-	if len(key) == 0 {
-		err = qkverror.ErrorKeyEmpty
-		return
-	}
-	return tidis.db.PTTL(txn, key)
 }
 
 //Expire set a key's time to live in seconds

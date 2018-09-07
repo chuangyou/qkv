@@ -15,4 +15,7 @@ var (
 	ErrorServerInternal   = errors.New("server internal error")
 	ErrorTypeNotMatch     = errors.New("key type not match")
 	ErrorInvalidMeta      = errors.New("invalid key meta")
+	ErrorInvalidRawData   = errors.New("invalid raw data")
+	ErrorWrongType        = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	ErrorNotInteger       = errors.New("value is not an integer or out of range")
 )

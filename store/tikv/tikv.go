@@ -3,7 +3,7 @@ package tikv
 import (
 	"context"
 	"fmt"
-	"math"
+	"time"
 
 	"github.com/chuangyou/qkv/config"
 	"github.com/chuangyou/qkv/qkverror"
@@ -102,11 +102,18 @@ func (tikv *Tikv) MGet(txn interface{}, keys [][]byte) (data map[string][]byte, 
 	var (
 		v        []byte
 		snapshot kv.Snapshot
+		tikv_txn kv.Transaction
+		ok       bool
 	)
 	if txn != nil {
+		tikv_txn, ok = txn.(kv.Transaction)
+		if !ok {
+			err = qkverror.ErrorServerInternal
+			return
+		}
 		data = make(map[string][]byte)
 		for _, key := range keys {
-			v, err = tikv.Get(txn, key)
+			v, err = tikv_txn.Get(key)
 			if err != nil {
 				data = nil
 				return
@@ -123,6 +130,7 @@ func (tikv *Tikv) MGet(txn interface{}, keys [][]byte) (data map[string][]byte, 
 			kvKeys[i] = keys[i]
 		}
 		data, err = snapshot.BatchGet(kvKeys)
+
 	}
 	return
 }
@@ -177,7 +185,8 @@ func (tikv *Tikv) DeleteWithTxn(txn interface{}, keys [][]byte) (deleted int64, 
 	var (
 		ok       bool
 		tikv_txn kv.Transaction
-		value    []byte
+		rawData  []byte
+		dataType byte
 	)
 	if txn == nil {
 		err = qkverror.ErrorServerInternal
@@ -189,10 +198,24 @@ func (tikv *Tikv) DeleteWithTxn(txn interface{}, keys [][]byte) (deleted int64, 
 		return
 	}
 	for _, k := range keys {
-		value, _ = tikv.Get(txn, k)
-		if value != nil {
+		rawData, _ = tikv.Get(txn, k)
+		if rawData != nil {
+			dataType, _, err = utils.DecodeData(rawData)
+			if err != nil {
+				return
+			}
+			switch dataType {
+			//delete set member
+			//delete zset member
+			//delete hash field
+			//delete list member
+			}
+			//			if err != nil {
+			//				return
+			//			}
 			deleted++
 		}
+
 		err = tikv_txn.Delete(k)
 		if err != nil {
 			deleted = 0
@@ -202,25 +225,28 @@ func (tikv *Tikv) DeleteWithTxn(txn interface{}, keys [][]byte) (deleted int64, 
 	return
 }
 
-//Incr increments the number stored at key by increment.
-func (tikv *Tikv) Incr(txn interface{}, key []byte, step int64) (ret int64, err error) {
+//SetEX set key to hold the string value and set key to timeout after a given number of seconds
+func (tikv *Tikv) SetEX(txn interface{}, key []byte, seconds int64, value []byte) (err error) {
 	var (
-		tikv_txn      kv.Transaction
-		ok            bool
-		value         []byte
-		oldStep       int64
-		newStep       int64
-		noTransaction bool
+		tikv_txn   kv.Transaction
+		ok         bool
+		expireTime int64
 	)
-
+	expireTime = seconds*1000 + (time.Now().UnixNano() / 1000 / 1000)
 	if txn != nil {
 		tikv_txn, ok = txn.(kv.Transaction)
 		if !ok {
 			err = qkverror.ErrorServerInternal
 			return
 		}
+		//set key -> value
+		err = tikv_txn.Set(key, value)
+		if err != nil {
+			return
+		}
+		//expire with txn(ms)
+		_, err = tikv.PExipre(txn, key, expireTime)
 	} else {
-		noTransaction = true
 		txn, err = tikv.NewTxn()
 		if err != nil {
 			err = qkverror.ErrorServerInternal
@@ -232,133 +258,78 @@ func (tikv *Tikv) Incr(txn interface{}, key []byte, step int64) (ret int64, err 
 			return
 		}
 		defer tikv_txn.Rollback()
-	}
-	value, err = tikv_txn.Get(key)
-	if err != nil {
-		if !kv.IsErrNotFound(err) {
-			return
-		}
-	}
-	//old value
-	oldStep, _ = utils.StrBytesToInt64(value)
-	//new value
-	newStep = oldStep + step
-	value, err = utils.Int64ToStrBytes(newStep)
-	if err != nil {
-		return
-	}
-	tikv_txn.Set(key, value)
-	if err != nil {
-		return
-	}
-	if noTransaction {
-		err = tikv_txn.Commit(context.Background())
+		//expire with txn(ms)
+		err = tikv_txn.Set(key, value)
 		if err != nil {
 			return
 		}
+		_, err = tikv.PExipre(tikv_txn, key, expireTime)
+		if err == nil {
+			err = tikv_txn.Commit(context.Background())
+		}
 	}
-	ret = newStep
 	return
+
 }
 
-func (tikv *Tikv) DeleteRangeWithTxn(txn interface{}, start []byte, end []byte, limit uint64) (deleted uint64, err error) {
+//PExipre This command works exactly like EXPIRE but the time to live of the key is specified in milliseconds instead of seconds.
+func (tikv *Tikv) PExipre(txn interface{}, key []byte, ts int64) (ret int, err error) {
 	var (
-		tikv_txn kv.Transaction
-		ok       bool
-		snapshot kv.Snapshot
-		it       kv.Iterator
-		key      kv.Key
+		v         []byte
+		ttlKey    []byte
+		ttlValue  []byte
+		ttlOld    uint64
+		expireKey []byte
+		tikv_txn  kv.Transaction
+		tsRaw     []byte
+		ok        bool
 	)
 	tikv_txn, ok = txn.(kv.Transaction)
 	if !ok {
 		err = qkverror.ErrorServerInternal
 		return
 	}
-	snapshot = tikv_txn.GetSnapshot()
-	it, err = snapshot.Seek(start)
+	v, err = tikv.Get(txn, key)
 	if err != nil {
 		return
 	}
-	defer it.Close()
-	if limit == 0 {
-		limit = math.MaxUint64
-	}
-	for limit > 0 {
-		if !it.Valid() {
-			break
-		}
-		key = it.Key()
-		if end != nil && key.Cmp(end) > 0 {
-			break
-		}
-		err = tikv_txn.Delete(key)
-		if err != nil {
-			return
-		}
-		limit--
-		deleted++
-		err = it.Next()
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-func (tikv *Tikv) GetRangeKeys(txn interface{},
-	start []byte,
-	withStart bool,
-	end []byte,
-	withEnd bool,
-	offset,
-	limit uint64,
-	countOnly bool) (keys [][]byte, count uint64, err error) {
-	var (
-		tikv_txn kv.Transaction
-		ok       bool
-		snapshot kv.Snapshot
-		it       kv.Iterator
-		key      kv.Key
-	)
-	tikv_txn, ok = txn.(kv.Transaction)
-	if !ok {
-		err = qkverror.ErrorServerInternal
+	if v == nil {
+		//not key
 		return
 	}
-	snapshot = tikv_txn.GetSnapshot()
-	it, err = snapshot.Seek(start)
+	//get ttl
+	ttlKey = utils.EncodeTTLKey(key)
+	ttlValue, err = tikv.Get(txn, ttlKey)
 	if err != nil {
 		return
 	}
-	defer it.Close()
-	for limit > 0 {
-		if !it.Valid() {
-			break
-		}
-		key = it.Key()
-
-		err = it.Next()
+	//get old ttl
+	if ttlValue != nil {
+		ttlOld, err = utils.BytesToUint64(ttlValue)
 		if err != nil {
 			return
 		}
-		if !withStart && key.Cmp(start) == 0 {
-			continue
+		//old expire key
+		expireKey = utils.EncodeExpireKey(key, int64(ttlOld))
+		//delete old expire key
+		err = tikv_txn.Delete(expireKey)
+		if err != nil {
+			return
 		}
-		if !withEnd && key.Cmp(end) == 0 {
-			break
-		}
-		if end != nil && key.Cmp(end) > 0 {
-			break
-		}
-		if offset > 0 {
-			offset--
-			continue
-		}
-		if countOnly {
-			count++
-		} else {
-			keys = append(keys, key)
-		}
-		limit--
+	}
+	//set expire key
+	expireKey = utils.EncodeExpireKey(key, ts)
+	err = tikv_txn.Set(expireKey, []byte{0})
+	if err != nil {
+		return
+	}
+	//set ttl key
+	tsRaw, _ = utils.Uint64ToBytes(uint64(ts))
+	err = tikv_txn.Set(ttlKey, tsRaw)
+	if err != nil {
+		return
+	} else {
+		ret = 1
 	}
 	return
 }

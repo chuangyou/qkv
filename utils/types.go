@@ -3,10 +3,6 @@ package utils
 const (
 	STRING_TYPE  byte = 0
 	SET_TYPE     byte = 1
-	SET_DATA     byte = 2
-	ZSET_TYPE    byte = 3
-	ZSET_DATA    byte = 4
-	ZSET_SCORE   byte = 5
 	TTL_TYPE     byte = 109
 	EXPTIME_TYPE byte = 110
 )
