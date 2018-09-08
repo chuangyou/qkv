@@ -15,7 +15,18 @@ QKV是基于TiKV打造的一款兼容redis协议的分布式NoSql数据库，支
 
 ## 架构图如下
 ## 安装部署
+
+PD以及TiKV部署参考如下（这里我们只需用到PD和TiKV）：
+- https://www.pingcap.com/docs-cn/
+
+QKV（生成二进制文件）:
+- go get -u github.com/chuangyou/qkv
+- go build -i
+
 ## 集群、扩容、缩容
+相关文档（主要是PD和TiKV扩容、缩容）：
+- https://www.pingcap.com/docs-cn/
+
 ## 命令支持
 
 ### key
