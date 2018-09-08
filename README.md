@@ -14,6 +14,7 @@ QKV是基于TiKV打造的一款兼容redis协议的分布式NoSql数据库，支
 - QKV只做协议转发与数据计算操作，TiKV做存储
 
 ## 架构图如下
+![](http://qimg2.store.quji.com/qps/2018/09/08/b9334d853db0.png)
 ## 安装部署
 
 PD以及TiKV部署参考如下（这里我们只需用到PD和TiKV）：
