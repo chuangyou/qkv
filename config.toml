@@ -1,9 +1,8 @@
 [qkv]
 address = "0.0.0.0:8379"
-max_connection = 10000
 auth = "1474741"
 logfile = ""
-loglevel = "debug"
+loglevel = "info"
 maxproc = 4
 #expire checker
 ttl_checker_loop = 10

@@ -6,7 +6,6 @@ import (
 
 type QKVConfig struct {
 	Address            string `toml:"address"`
-	MaxConnection      int32  `toml:"max_connection"`
 	Auth               string `toml:"auth"`
 	LogFile            string `toml:"logfile"`
 	LogLevel           string `toml:"loglevel"`
