@@ -104,6 +104,11 @@ func delExpireKey(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, 
 			if _, err = tdb.ClearHash(tikv_txn, key); err != nil {
 				return
 			}
+		//delete list member
+		case utils.LIST_TYPE:
+			if _, err = tdb.ClearListMembers(tikv_txn, key); err != nil {
+				return
+			}
 		}
 
 		//delete key

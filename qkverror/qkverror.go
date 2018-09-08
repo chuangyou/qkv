@@ -18,4 +18,5 @@ var (
 	ErrorInvalidRawData   = errors.New("invalid raw data")
 	ErrorWrongType        = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	ErrorNotInteger       = errors.New("value is not an integer or out of range")
+	ErrorOutOfRange       = errors.New("index out of range")
 )

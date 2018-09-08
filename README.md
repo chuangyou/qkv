@@ -94,3 +94,14 @@ QKV（生成二进制文件）:
 - HSETNX
 - HSTRLEN
 - HVALS
+
+### list
+- LINDEX
+- LLEN
+- LPOP
+- LPUSH
+- LRANGE
+- LSET
+- LTRIM
+- RPOP
+- RPUSH

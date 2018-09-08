@@ -270,3 +270,38 @@ func DecodeHashData(rawkey []byte) (key []byte, field []byte, err error) {
 	field = rawkey[pos:]
 	return
 }
+
+// type(1)|keylen(2)|key|index(8)
+func EncodeListData(key []byte, idx uint64) (buf []byte) {
+	var (
+		pos int
+	)
+	buf = make([]byte, len(key)+1+2+8)
+	buf[pos] = LIST_DATA
+	pos++
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+	Uint64ToBytesExt(buf[pos:], idx)
+	return
+}
+
+// type(1)|keylen(2)|key|index(8)
+func DecodeListData(rawkey []byte) (key []byte, idx uint64, err error) {
+	var (
+		pos    int
+		keyLen uint16
+	)
+	if rawkey[0] != LIST_DATA {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+	keyLen, _ = BytesToUint16(rawkey[pos:])
+	pos = pos + 2
+	key = rawkey[pos : pos+int(keyLen)]
+	pos = pos + int(keyLen)
+	idx, _ = BytesToUint64(rawkey[pos:])
+	return
+}
