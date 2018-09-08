@@ -354,6 +354,54 @@ func (tikv *Tikv) GetRangeKeys(txn interface{},
 	}
 	return
 }
+func (tikv *Tikv) GetRangeKeysValues(txn interface{}, start []byte, end []byte, limit uint64, withkeys bool) (kvs [][]byte, err error) {
+	var (
+		tikv_txn kv.Transaction
+		ok       bool
+		snapshot kv.Snapshot
+		it       kv.Iterator
+		key      kv.Key
+		value    kv.Key
+	)
+	if txn == nil {
+		snapshot, err = tikv.store.GetSnapshot(kv.MaxVersion)
+		if err != nil {
+			return
+		}
+	} else {
+		tikv_txn, ok = txn.(kv.Transaction)
+		if !ok {
+			err = qkverror.ErrorServerInternal
+			return
+		}
+		snapshot = tikv_txn.GetSnapshot()
+	}
+	it, err = snapshot.Seek(start)
+	if err != nil {
+		return
+	}
+	defer it.Close()
+	for limit > 0 {
+		if !it.Valid() {
+			break
+		}
+		key = it.Key()
+		value = it.Value()
+		if end != nil && key.Cmp(end) > 0 {
+			break
+		}
+		if withkeys {
+			kvs = append(kvs, key)
+		}
+		kvs = append(kvs, value)
+		limit--
+		err = it.Next()
+		if err != nil {
+			return
+		}
+	}
+	return
+}
 func (tikv *Tikv) DeleteRangeWithTxn(txn interface{}, start []byte, end []byte, limit uint64) (deleted uint64, err error) {
 	var (
 		tikv_txn kv.Transaction

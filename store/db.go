@@ -10,5 +10,6 @@ type DB interface {
 	PExipre(interface{}, []byte, int64) (int, error)
 	DeleteRangeWithTxn(interface{}, []byte, []byte, uint64) (uint64, error)
 	GetRangeKeys(interface{}, []byte, bool, []byte, bool, uint64, uint64, bool) ([][]byte, uint64, error)
+	GetRangeKeysValues(interface{}, []byte, []byte, uint64, bool) ([][]byte, error)
 	NewTxn() (interface{}, error)
 }

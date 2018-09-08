@@ -234,3 +234,39 @@ func ZScoreOffset(score int64) uint64 {
 func ZScoreRestore(rscore uint64) int64 {
 	return int64(rscore - uint64(SCORE_MAX))
 }
+
+// type(1)|keylen(2)|key|field
+func EncodeHashData(key, field []byte) (buf []byte) {
+	var (
+		pos = 0
+	)
+	buf = make([]byte, 1+2+len(key)+len(field))
+	buf[0] = HASH_DATA
+	pos++
+	Uint16ToBytesExt(buf[pos:], uint16(len(key)))
+	pos = pos + 2
+	copy(buf[pos:], key)
+	pos = pos + len(key)
+	copy(buf[pos:], field)
+	return buf
+}
+
+// type(1)|keylen(2)|key|field
+func DecodeHashData(rawkey []byte) (key []byte, field []byte, err error) {
+	var (
+		pos    uint16 = 0
+		keyLen uint16
+	)
+
+	if rawkey[0] != HASH_DATA {
+		err = qkverror.ErrorTypeNotMatch
+		return
+	}
+	pos++
+	keyLen, _ = BytesToUint16(rawkey[pos:])
+	pos = pos + 2
+	key = rawkey[pos : pos+keyLen]
+	pos = pos + keyLen
+	field = rawkey[pos:]
+	return
+}

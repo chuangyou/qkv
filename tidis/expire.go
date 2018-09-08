@@ -44,7 +44,7 @@ func (tidis *Tidis) DeleteIfExpired(txn interface{}, key []byte, delValue bool) 
 	if err != nil {
 		return
 	}
-	//delete string data
+	//delete data
 	if delValue {
 		keys = append(keys, key)
 		_, err = tidis.DeleteWithTxn(txn, keys)

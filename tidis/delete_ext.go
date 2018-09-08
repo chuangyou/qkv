@@ -38,6 +38,8 @@ func (tidis *Tidis) DeleteWithTxn(txn interface{}, keys [][]byte) (deleted int64
 			case utils.ZSET_TYPE:
 				_, err = tidis.ZRemRangeByScore(txn, k, utils.SCORE_MIN, utils.SCORE_MAX)
 				//delete hash field
+			case utils.HASH_TYPE:
+				_, err = tidis.ClearHash(txn, k)
 				//delete list member
 			}
 			if err != nil {

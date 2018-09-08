@@ -17,18 +17,47 @@ var redisPool *redis.Pool
 
 //redis> TTL cache_user_id  # 剩余生存时间
 //(integer) 49
+type Test struct {
+	Username  string `redis:"username"`
+	Username1 string `redis:"username1"`
+	Age       int    `redis:"age"`
+	Sex       int8   `redis:"sex"`
+	BirthDay  string `redis:"birthday"`
+}
+
 func main() {
 	redisPool = newPool("192.168.16.200:8379", "1474741")
 	conn := getRedis()
 	defer conn.Close()
-	log.Println(conn.Do("ZADD", "zset_test2", 1, "a"))
-	log.Println(conn.Do("ZADD", "zset_test2", 2, "b"))
-	log.Println(conn.Do("ZINCRBY", "zset_test2", 2, "b"))
-	log.Println(conn.Do("ZADD", "zset_test2", 456456, "c"))
+	log.Println(conn.Do("HDEL", "zset_test2", "age"))
+	log.Println(conn.Do("HSET", "zset_test2", "username", "aaaa"))
+	log.Println(redis.Int(conn.Do("HSTRLEN", "zset_test2", "username")))
+	log.Println(conn.Do("HMSET", "zset_test2", "sex", 3, "birthday", "1991"))
+	log.Println(redis.Int(conn.Do("HSETNX", "zset_test2", "username", "1111")))
+	log.Println(redis.Int(conn.Do("HSETNX", "zset_test2", "username1", "1111")))
+	log.Println(conn.Do("HINCRBY", "zset_test2", "age", 1))
+	log.Println(conn.Do("HINCRBY", "zset_test2", "age", 2))
+	log.Println(conn.Do("HINCRBY", "zset_test2", "age", -3))
+	//	log.Println(redis.Int(conn.Do("HEXISTS", "zset_test2", "username")))
+	//	log.Println(redis.Int(conn.Do("HDEL", "zset_test2", "username")))
+	//	log.Println(redis.Int(conn.Do("HEXISTS", "zset_test2", "username")))
+	log.Println(redis.Strings(conn.Do("HVALS", "zset_test2")))
+	log.Println(redis.Strings(conn.Do("HMGET", "zset_test2", "username", "age", "sn")))
+	log.Println(redis.Int(conn.Do("HLEN", "zset_test2")))
+	//	log.Println(redis.Int(conn.Do("DEL", "zset_test2")))
 	log.Println(redis.Int(conn.Do("EXPIRE", "zset_test2", 10)))
-	log.Println(redis.Strings(conn.Do("ZRANGE", "zset_test2", 0, -1, "WITHSCORES")))
+	log.Println(redis.Int(conn.Do("TTL", "zset_test2")))
 	time.Sleep(time.Second * 11)
-	log.Println(redis.Strings(conn.Do("ZRANGE", "zset_test2", 0, -1, "WITHSCORES")))
+	v, _ := redis.Values(conn.Do("HGETALL", "zset_test2"))
+	testInfo := Test{}
+	err := redis.ScanStruct(v, &testInfo)
+	log.Println(err, testInfo)
+	//	log.Println(conn.Do("ZINCRBY", "zset_test2", 2, "b"))
+	//	log.Println(conn.Do("ZADD", "zset_test2", 456456, "c"))
+	//	log.Println(redis.Int(conn.Do("EXPIRE", "zset_test2", 10)))
+	//	log.Println(redis.Strings(conn.Do("ZRANGE", "zset_test2", 0, -1, "WITHSCORES")))
+	//	time.Sleep(time.Second * 11)
+	//	log.Println(redis.Strings(conn.Do("ZRANGE", "zset_test2", 0, -1, "WITHSCORES")))
 
 }
 func getRedis() redis.Conn {

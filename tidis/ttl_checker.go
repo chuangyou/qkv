@@ -99,7 +99,13 @@ func delExpireKey(tdb *Tidis, tikv_txn kv.Transaction, startKey, endKey []byte, 
 			if _, err = tdb.ZRemRangeByScore(tikv_txn, key, utils.SCORE_MIN, utils.SCORE_MAX); err != nil {
 				return
 			}
+		//delete hash
+		case utils.HASH_TYPE:
+			if _, err = tdb.ClearHash(tikv_txn, key); err != nil {
+				return
+			}
 		}
+
 		//delete key
 		if err = tikv_txn.Delete(key); err != nil {
 			return
